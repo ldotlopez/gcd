@@ -6,11 +6,11 @@ import gcd
 
 class API(gcd.API):
     def __init__(self, *args, **kwargs):
-        # kwargs['storage_backend'] = 'sa'
-        # kwargs['storage_opts'] = {
-        #     'dburi': 'sqlite:///:memory:'
-        # }
-        kwargs['storage_backend'] = 'default'
+        kwargs['storage_backend'] = 'sa'
+        kwargs['storage_opts'] = {
+            'dburi': 'sqlite:///:memory:'
+        }
+        # kwargs['storage_backend'] = 'default'
         super().__init__(*args, **kwargs)
 
 

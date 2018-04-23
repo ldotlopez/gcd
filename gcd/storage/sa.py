@@ -15,75 +15,76 @@ from sqlalchemy import (
 from sqlalchemy.ext import declarative
 
 
-from gcd import (
-    TagError,
-    storage
-)
+import gcd
 
 
 Base = declarative.declarative_base()
 
 
-def create_engine(uri='sqlite:///:memory:', echo=False):
-    engine = sqlalchemy.create_engine(uri, echo=echo)
-
-    if uri.startswith('sqlite:///'):
-        @event.listens_for(engine, "connect")
-        def set_sqlite_pragma(conn, record):
-            cursor = conn.cursor()
-            cursor.execute("PRAGMA foreign_keys=ON")
-            cursor.close()
-
-    return engine
-
-
-def create_session(uri=None, engine=None, echo=False):
-    if not engine:
-        engine = create_engine(uri=uri, echo=echo)
-
-    sess = orm.sessionmaker()
-    sess.configure(bind=engine)
-    Base.metadata.create_all(engine)
-    return sess()
-
-
-class Message(Base):
-    __tablename__ = 'message'
+class NativePacket(Base):
+    __tablename__ = 'packet'
     id = Column(Integer, primary_key=True)
-    timestamp = Column(TIMESTAMP, default=datetime.now, nullable=False)
+    timestamp = Column(TIMESTAMP, nullable=False)
     tag = Column(String(256), nullable=False)
     value = Column(BLOB, nullable=True)
 
 
-class Storage(storage.Storage):
+class Storage(gcd.Storage):
     def __init__(self, dburi):
-        self.db = create_session(dburi)
+        self.db = self._create_session(dburi)
 
-    def _query_set_for_tag(self, tag):
-        qs = self.db.query(Message)
-        qs = qs.filter(Message.tag == tag)
-        qs = qs.order_by(Message.timestamp.desc())
-        return qs
-
-    def save(self, tag, value):
-        value = json.dumps(value).encode('utf-8')
-        message = Message(tag=tag, value=value)
-        self.db.add(message)
+    def save(self, packet):
+        self.db.add(self._gcd_to_native(packet))
         self.db.commit()
 
     def get(self, tag):
-        msg = self._query_set_for_tag(tag).first()
-        if msg is None:
-            raise TagError(tag)
+        native = self._query_set_for_tag(tag).first()
+        if native is None:
+            raise gcd.TagError(tag)
 
-        return json.loads(msg.value.decode('utf-8'))
+        return self._native_to_gcd(native)
 
     def log(self, tag):
         qs = self._query_set_for_tag(tag)
         if qs.count() == 0:
-            raise TagError(tag)
+            raise gcd.TagError(tag)
 
-        yield from (
-            json.loads(msg.value.decode('utf-8'))
-            for msg in qs
-        )
+        yield from (self._native_to_gcd(native) for native in qs)
+
+    def _query_set_for_tag(self, tag):
+        qs = self.db.query(NativePacket)
+        qs = qs.filter(NativePacket.tag == tag)
+        qs = qs.order_by(NativePacket.timestamp.desc())
+        return qs
+
+    @staticmethod
+    def _create_session(uri='sqlite:///:memory:', echo=False):
+        engine = sqlalchemy.create_engine(uri, echo=echo)
+
+        if uri.startswith('sqlite:///'):
+            @event.listens_for(engine, "connect")
+            def set_sqlite_pragma(conn, record):
+                cursor = conn.cursor()
+                cursor.execute("PRAGMA foreign_keys=ON")
+                cursor.close()
+
+        sess = orm.sessionmaker()
+        sess.configure(bind=engine)
+        Base.metadata.create_all(engine)
+        return sess()
+
+
+
+    @staticmethod
+    def _gcd_to_native(packet):
+        return NativePacket(
+            tag=packet.tag,
+            value=json.dumps(packet.value).encode('utf-8'),
+            timestamp=packet.timestamp)
+
+    @staticmethod
+    def _native_to_gcd(native):
+        return gcd.Packet(
+            tag=native.tag,
+            value=json.loads(native.value.decode('utf-8')),
+            timestamp=native.timestamp)

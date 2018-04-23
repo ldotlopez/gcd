@@ -32,22 +32,27 @@ class API():
         try:
             prev = self.storage.get(tag)
         except TagError:
-            prev = Undefined
+            prev = None
 
-        timestamp = datetime.datetime.now()
-        self.storage.save(tag, value, timestamp)
-        if prev != value:
-            self.notify(Event.VALUE_CHANGED, value=value, prev=prev)
+        packet = Packet(tag=tag, value=value)
+        self.storage.save(packet)
+
+        if prev is None or prev.value != packet.value:
+            prev_value = Undefined if prev is None else prev.value
+            self.notify(Event.VALUE_CHANGED,
+                        value=packet.value, prev=prev_value)
 
     def get(self, tag):
-        return self.storage.get(tag)
+        packet = self.storage.get(tag)
+        return packet.value
 
     def log(self, tag):
         g = self.storage.log(tag)
 
         while True:
             try:
-                yield next(g)
+                packet = next(g)
+                yield packet.value
             except StopIteration:
                 break
 
@@ -68,7 +73,7 @@ class Storage:
     def __init__(self, **storage_opts):
         raise NotImplementedError()
 
-    def save(self, tag, value):
+    def save(self, packet):
         raise NotImplementedError()
 
     def get(self, tag):

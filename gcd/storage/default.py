@@ -15,40 +15,33 @@ class Storage(gcd.Storage):
 
         self._db = dbm.open(filepath, 'c')
 
-    def _native_get(self, tag):
-        container = self._db[tag]
+    def _native_get(self, native_tag):
+        container = self._db[native_tag]
         container = pickle.loads(container, encoding='utf-8')
         return container
 
-    def _native_save(self, tag, container):
-        self._db[tag] = pickle.dumps(container)
+    def _native_save(self, native_tag, container):
+        self._db[native_tag] = pickle.dumps(container)
 
-    def save(self, tag, value, timestamp=None):
-        if not timestamp:
-            timestamp = datetime.now()
-
-        tag_bytes = tag.encode('utf-8')
+    def save(self, packet):
+        native_tag = packet.tag.encode('utf-8')
 
         try:
-            container = self._native_get(tag_bytes)
+            container = self._native_get(native_tag)
         except KeyError:
             container = []
 
-        container.append({
-            'tag': tag,
-            'value': value,
-            'timestamp': timestamp
-        })
-        self._native_save(tag_bytes, container)
+        container.append(packet)
+        self._native_save(native_tag, container)
 
     def get(self, tag):
-        tag_bytes = tag.encode('utf-8')
+        native_tag = tag.encode('utf-8')
         try:
-            container = self._native_get(tag)
+            container = self._native_get(native_tag)
         except KeyError as e:
             raise gcd.TagError(tag) from e
 
-        return container[-1]['value']
+        return container[-1]
 
     def log(self, tag):
         tag_bytes = tag.encode('utf-8')
@@ -57,7 +50,4 @@ class Storage(gcd.Storage):
         except KeyError as e:
             raise gcd.TagError(tag) from e
 
-        yield from (
-            pack['value']
-            for pack in reversed(container)
-        )
+        yield from reversed(container)
