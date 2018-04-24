@@ -88,7 +88,7 @@ class Packet:
         if not isinstance(tag, str) or not tag:
             raise TypeError(tag, "expected not empty string")
 
-        now = datetime.datetime.now()
+        now = datetime.datetime.utcnow()
         if timestamp is None:
             timestamp = now
         else:
