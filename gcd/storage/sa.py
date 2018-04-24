@@ -7,6 +7,7 @@ from sqlalchemy import (
     event,
     orm,
     Column,
+    PrimaryKeyConstraint,
     BLOB,
     Integer,
     String,
@@ -19,14 +20,24 @@ import gcd
 
 
 Base = declarative.declarative_base()
+Base.metadata.naming_convention = {
+    "ix": 'ix_%(column_0_label)s',
+    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s"
+}
 
 
 class NativePacket(Base):
     __tablename__ = 'packet'
-    id = Column(Integer, primary_key=True)
-    timestamp = Column(TIMESTAMP, nullable=False)
+    __table_args__ = (
+        PrimaryKeyConstraint('tag', 'timestamp'),
+    )
+
     tag = Column(String(256), nullable=False)
     value = Column(BLOB, nullable=True)
+    timestamp = Column(TIMESTAMP, nullable=False)
 
 
 class Storage(gcd.Storage):
