@@ -1,0 +1,6 @@
+*old
+*old.py
+.DS_Store
+*.sublime-workspace
+__pycache__
+*.pyc
